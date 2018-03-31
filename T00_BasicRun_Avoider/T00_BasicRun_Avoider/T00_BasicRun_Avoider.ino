@@ -8,7 +8,7 @@
 
 // initialize the library with the numbers of the interface pins
 //LiquidCrystal lcd(6,7,8,9,10,11);
-LiquidCrystal lcd(2, 3, A3, 13, A5, A4); //핀 번호를 잘 확인하자
+LiquidCrystal lcd(2, 3, A3, A4, A5, 13); //핀 번호를 잘 확인하자
 
 #define FRONT_SENSOR A1
 #define LEFT_SENSOR A0
@@ -64,8 +64,9 @@ void setup() {
 	// set up the LCD's number of columns and rows:
 	lcd.begin(16, 2);
 	// Print a message to the LCD.
+	lcd.setCursor(0, 0);
 	lcd.print("Micro Mouse");
-
+	delay(500);
 	//////////////// StepMotor init
 	pinMode(4, OUTPUT);
 	pinMode(5, OUTPUT);
@@ -85,8 +86,8 @@ void setup() {
 
 
 	//Ready  
-	while (digitalRead(12) == 0);
-	delay(500);
+	//while (digitalRead(12) == 0);     //180330: 스위치 처리를 인터럽트 방식으로 수정하여 삭제함
+	//delay(500);
 
 	LeftMotorTimer = micros();
 	RightMotorTimer = micros() + 10;
@@ -115,8 +116,8 @@ void GoForward() {
 	LeftMotorDir = RightMotorDir = FORWARD;
 	IsMotorOn |= 0;
 	IsMotorOn |= 0;		//직진할때는 모터 동작 상태를 설정하지 않음(계속 동작할수 있도록)
-	lcd.setCursor(12, 0);
-	lcd.print("FORW");
+	//lcd.setCursor(12, 0);
+	//lcd.print("FORW");
 }
 
 void LeftTurn() {
@@ -127,8 +128,8 @@ void LeftTurn() {
 	RightMotorDir = FORWARD;
 	LeftMotorDir = BACKWARD;
 	IsMotorOn |= 3;
-	lcd.setCursor(12, 0);
-	lcd.print("LEFT");
+	//lcd.setCursor(12, 0);
+	//lcd.print("LEFT");
 }
 
 void RightTurn() {
@@ -139,14 +140,19 @@ void RightTurn() {
 	RightMotorDir = BACKWARD;
 	LeftMotorDir = FORWARD;
 	IsMotorOn |= 3;
-	lcd.setCursor(12, 0);
-	lcd.print("RIGHT");
+	//lcd.setCursor(12, 0);
+	//lcd.print("RIGHT");
 }
 
 void Sensor(void) {
 	Distance[FRONT] = analogRead(FRONT_SENSOR);
 	Distance[LEFT] = analogRead(LEFT_SENSOR);
 	Distance[RIGHT] = analogRead(RIGHT_SENSOR);
+
+	if (millis() >= systemTimer + 500) { //500ms마다
+		systemTimer = millis();
+		LCD();
+	}
 }
 
 void printWithZero(int num) {
@@ -159,22 +165,15 @@ void printWithZero(int num) {
 	lcd.print(num);
 }
 
-void LCD(void) {
-	lcd.setCursor(0, 1);
-	lcd.print("F");
+void LCD(void) {								
+	lcd.setCursor(1, 1);
+	lcd.print("F"); 
 	printWithZero(Distance[FRONT]);
-	lcd.print(" L");
+	lcd.print(" L"); 
 	printWithZero(Distance[LEFT]);
-	lcd.print(" R");
+	lcd.print(" R"); 
 	printWithZero(Distance[RIGHT]);
-	/*
-	Serial.print("Front = ");
-	Serial.print(Distance[0]);
-	Serial.print(" Left = ");
-	Serial.print(Distance[1]);
-	Serial.print(" Right = ");
-	Serial.println(Distance[2]);
-	*/
+	lcd.setCursor(15, 1);						//LCD 출력시 검은 칸만 나오거나 LCD 반만 글씨가 출력되는 현상이 발생함. 커서의 마지막 위치를 지정했더니 그런 현상이 없어짐
 }
 
 void LeftMotorStep() {
@@ -249,10 +248,6 @@ void RightMotorStep() {
 void loop() {
 	Sensor();
 
-	if (millis() >= systemTimer + 500) { //500ms마다
-		systemTimer = millis();
-		LCD();
-	}
 	if (MotorAllOn == 1) {			//모터 동작 전체를 제어
 		if (micros() >= LeftMotorTimer + LeftSpeed) {
 			LeftMotorTimer = micros();
@@ -321,31 +316,31 @@ void loop() {
 
 			}
 
-			lcd.setCursor(15, 1);
+			//lcd.setCursor(15, 1);
 			RightSpeed = LeftSpeed = DEFAULT_SPEED;
 			if (CalibrationDirection == LEFT) {
-				lcd.print("L");
+				//lcd.print("L");
 				LeftSpeed = DEFAULT_SPEED + (SPEED_OFFSET * CalibrationValue * 2);
 			}
 			else if (CalibrationDirection == RIGHT) {
-				lcd.print("R");
+				//lcd.print("R");
 				RightSpeed = DEFAULT_SPEED + (SPEED_OFFSET * CalibrationValue * 2);
 			}
 			else {
-				lcd.print("N");
+				//lcd.print("N");
 			}
 			GoForward();
 		}
 		else {
 			LeftSpeed = DEFAULT_SPEED;
 			RightSpeed = DEFAULT_SPEED;
-			Serial.println("FrontWall detected");
+			//Serial.println("FrontWall detected");
 			if (Distance[LEFT] < Distance[RIGHT]) {   //왼쪽에 벽이 없으면
-				Serial.println("Left");
+				//Serial.println("Left");
 				LeftTurn();
 			}
 			else {
-				Serial.println("right");
+				//Serial.println("right");
 				RightTurn();
 			}
 		}
@@ -353,7 +348,7 @@ void loop() {
 }
 
 ISR(PCINT0_vect) {
-	delay(700);
+	delay(1000);
 	if (1 == MotorAllOn) {
 		MotorAllOn = 0;
 	}
