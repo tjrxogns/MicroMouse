@@ -51,11 +51,12 @@ int Distance[3];    //front Left fight 순서로 센서값 저장
 #define RightStep(a,b,c,d) digitalWrite(8, a);   digitalWrite(9, b);   digitalWrite(10, c);   digitalWrite(11, d);
 
 int IsMotorOn;			//특정 모터가 동작해야하는 상태인지 판단하는 변수
-int MotorAllOn;			//로봇의 동작 전체를 On/Off 하는 변수
+int RobotStart;			//로봇의 동작 전체를 On/Off 하는 변수
 
 int CalibrationDirection;
 int CalibrationValue;
 
+int voltage;
 
 void setup() {
 	Serial.begin(9600);
@@ -148,6 +149,7 @@ void Sensor(void) {
 	Distance[FRONT] = analogRead(FRONT_SENSOR);
 	Distance[LEFT] = analogRead(LEFT_SENSOR);
 	Distance[RIGHT] = analogRead(RIGHT_SENSOR);
+	voltage = analogRead(A7);
 
 	if (millis() >= systemTimer + 500) { //500ms마다
 		systemTimer = millis();
@@ -165,7 +167,9 @@ void printWithZero(int num) {
 	lcd.print(num);
 }
 
-void LCD(void) {								
+void LCD(void) {
+	lcd.setCursor(12, 0);
+	printWithZero(voltage/2);
 	lcd.setCursor(1, 1);
 	lcd.print("F"); 
 	printWithZero(Distance[FRONT]);
@@ -245,10 +249,14 @@ void RightMotorStep() {
 	}
 }
 
+void Position() {
+}
+
+
 void loop() {
 	Sensor();
-
-	if (MotorAllOn == 1) {			//모터 동작 전체를 제어
+	Position();
+	if (RobotStart == 1) {			//모터 동작 전체를 제어
 		if (micros() >= LeftMotorTimer + LeftSpeed) {
 			LeftMotorTimer = micros();
 			LeftMotorStep();
@@ -349,11 +357,11 @@ void loop() {
 
 ISR(PCINT0_vect) {
 	delay(1000);
-	if (1 == MotorAllOn) {
-		MotorAllOn = 0;
+	if (1 == RobotStart) {
+		RobotStart = 0;
 	}
 	else {
-		MotorAllOn = 1;
+		RobotStart = 1;
 	}
 
 }
