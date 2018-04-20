@@ -1,6 +1,6 @@
 /*
 180201 : STEP 모터를 사용하는 기본 동작
-직진 보정시 모터 속도를 조절하여 제어함.
+         직진 보정시 모터 속도를 조절하여 제어함.
 */
 
 // include the library code:
@@ -57,7 +57,6 @@ int CalibrationDirection;
 int CalibrationValue;
 
 int voltage;
-int KeyPushed = 0;
 
 void setup() {
 	Serial.begin(9600);
@@ -118,8 +117,8 @@ void GoForward() {
 	LeftMotorDir = RightMotorDir = FORWARD;
 	IsMotorOn |= 0;
 	IsMotorOn |= 0;		//직진할때는 모터 동작 상태를 설정하지 않음(계속 동작할수 있도록)
-						//lcd.setCursor(12, 0);
-						//lcd.print("FORW");
+	//lcd.setCursor(12, 0);
+	//lcd.print("FORW");
 }
 
 void LeftTurn() {
@@ -169,23 +168,14 @@ void printWithZero(int num) {
 }
 
 void LCD(void) {
-
-	////////////////////////////////////전압
 	lcd.setCursor(12, 0);
-	long temp = voltage;
-	temp = temp * 500 / 1024 * 3;
-	lcd.print(temp / 100);	//5v 로 ADC, 3셀을 1/3로 분배하여 ADC 하므로..
-	lcd.print(".");
-	lcd.print(temp % 100);
-
-
-	//////////////////////////////////////////////////센서값
+	printWithZero(voltage/2);
 	lcd.setCursor(1, 1);
-	lcd.print("F");
+	lcd.print("F"); 
 	printWithZero(Distance[FRONT]);
-	lcd.print(" L");
+	lcd.print(" L"); 
 	printWithZero(Distance[LEFT]);
-	lcd.print(" R");
+	lcd.print(" R"); 
 	printWithZero(Distance[RIGHT]);
 	lcd.setCursor(15, 1);						//LCD 출력시 검은 칸만 나오거나 LCD 반만 글씨가 출력되는 현상이 발생함. 커서의 마지막 위치를 지정했더니 그런 현상이 없어짐
 }
@@ -264,10 +254,6 @@ void Position() {
 
 
 void loop() {
-	if (KeyPushed == 1) {
-		delay(500);
-		KeyPushed = 0;
-	}
 	Sensor();
 	Position();
 	if (RobotStart == 1) {			//모터 동작 전체를 제어
@@ -358,7 +344,7 @@ void loop() {
 			RightSpeed = DEFAULT_SPEED;
 			//Serial.println("FrontWall detected");
 			if (Distance[LEFT] < Distance[RIGHT]) {   //왼쪽에 벽이 없으면
-													  //Serial.println("Left");
+				//Serial.println("Left");
 				LeftTurn();
 			}
 			else {
@@ -370,15 +356,14 @@ void loop() {
 }
 
 ISR(PCINT0_vect) {
-	if (digitalRead(12) == 1 && KeyPushed == 0) {
-		KeyPushed = 1;
-		if (RobotStart == 0) {
-			RobotStart = 1;
-		}
-		else {
-			RobotStart = 0;
-		}
+	delay(1000);
+	if (1 == RobotStart) {
+		RobotStart = 0;
 	}
+	else {
+		RobotStart = 1;
+	}
+
 }
 
 
