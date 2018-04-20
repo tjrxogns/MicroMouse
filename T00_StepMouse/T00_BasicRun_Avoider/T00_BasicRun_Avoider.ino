@@ -18,12 +18,17 @@ LiquidCrystal lcd(2, 3, A3, A4, A5, 13); //핀 번호를 잘 확인하자
 #define LEFT 1
 #define RIGHT 2
 
+#define NORTH 1
+#define SOUTH 3
+#define EAST 2
+#define WEST 4
 
 #define FORWARD 1
 #define BACKWARD 2
 
 #define TURN_90_STEP 85   //90도 회전 스텝
-#define ONECELL_STEP 10   //1칸 이동 거리 (현재는 사용하지 않음)
+#define ONECELL_STEP 221   //바퀴지릅 5.2cm -> 한스텝 이동 거리 : 3.14 /200 = 0.0814cm -> 한칸 이동 스탭수 18cm/0.0814 = 221
+
 
 #define TRUE 1
 #define FALSE 0
@@ -50,13 +55,20 @@ int Distance[3];    //front Left fight 순서로 센서값 저장
 #define LeftStep(a,b,c,d) digitalWrite(4, a);   digitalWrite(5, b);   digitalWrite(6, c);   digitalWrite(7, d);
 #define RightStep(a,b,c,d) digitalWrite(8, a);   digitalWrite(9, b);   digitalWrite(10, c);   digitalWrite(11, d);
 
-int IsMotorOn;			//특정 모터가 동작해야하는 상태인지 판단하는 변수
+int IsMotorTurning;			//특정 모터가 동작해야하는 상태인지 판단하는 변수
+int IsMotorGoingForward;
 int RobotStart;			//로봇의 동작 전체를 On/Off 하는 변수
 
 int CalibrationDirection;
 int CalibrationValue;
 
 int voltage;
+int KeyPushed = 0;
+
+#define MAZE_SIZE 5
+int Robot_x = MAZE_SIZE;		//좌표를 +-로 계산하므로 미로크기를 초기위치로 지정
+int Robot_y = MAZE_SIZE;
+int RobotDir = 1;
 
 void setup() {
 	Serial.begin(9600);
@@ -67,7 +79,7 @@ void setup() {
 	// Print a message to the LCD.
 	lcd.setCursor(0, 0);
 	lcd.print("Micro Mouse");
-	delay(500);
+	//delay(500);
 	//////////////// StepMotor init
 	pinMode(4, OUTPUT);
 	pinMode(5, OUTPUT);
@@ -91,7 +103,7 @@ void setup() {
 	//delay(500);
 
 	LeftMotorTimer = micros();
-	RightMotorTimer = micros() + 10;
+	RightMotorTimer = micros() + 500;
 	systemTimer = millis();
 
 	LeftMotorDir = RightMotorDir = FORWARD;
@@ -115,10 +127,9 @@ void GoForward() {
 	LeftMotorStepCounter = 0;
 	RightMotorStepCounter = 0;
 	LeftMotorDir = RightMotorDir = FORWARD;
-	IsMotorOn |= 0;
-	IsMotorOn |= 0;		//직진할때는 모터 동작 상태를 설정하지 않음(계속 동작할수 있도록)
 	//lcd.setCursor(12, 0);
 	//lcd.print("FORW");
+	IsMotorGoingForward = LEFT & RIGHT;
 }
 
 void LeftTurn() {
@@ -128,7 +139,7 @@ void LeftTurn() {
 	RightMotorStepCounter = 0;
 	RightMotorDir = FORWARD;
 	LeftMotorDir = BACKWARD;
-	IsMotorOn |= 3;
+	IsMotorTurning = LEFT & RIGHT;
 	//lcd.setCursor(12, 0);
 	//lcd.print("LEFT");
 }
@@ -140,7 +151,7 @@ void RightTurn() {
 	RightMotorStepCounter = 0;
 	RightMotorDir = BACKWARD;
 	LeftMotorDir = FORWARD;
-	IsMotorOn |= 3;
+	IsMotorTurning = LEFT & RIGHT;
 	//lcd.setCursor(12, 0);
 	//lcd.print("RIGHT");
 }
@@ -168,9 +179,27 @@ void printWithZero(int num) {
 }
 
 void LCD(void) {
+	lcd.setCursor(0, 0);
+	lcd.print(IsMotorGoingForward);
+
+	lcd.setCursor(2, 0);
+	lcd.print(IsMotorTurning);
+
+	lcd.setCursor(5, 0);
+	lcd.print("(");
+	lcd.print(Robot_x);
+	lcd.print(",");
+	lcd.print(Robot_y);
+	lcd.print(")");
+
 	lcd.setCursor(12, 0);
-	printWithZero(voltage/2);
-	lcd.setCursor(1, 1);
+	long temp = voltage;
+	temp = temp * 500 / 1024 * 3;
+	lcd.print(temp/100);	//5v 로 ADC, 3셀을 1/3로 분배하여 ADC 하므로..
+	lcd.print(".");
+	lcd.print(temp%100);
+
+	lcd.setCursor(0, 1);
 	lcd.print("F"); 
 	printWithZero(Distance[FRONT]);
 	lcd.print(" L"); 
@@ -182,16 +211,17 @@ void LCD(void) {
 
 void LeftMotorStep() {
 	if (LeftMotorStepCounter >= LeftMotorStepTarget) {
-		IsMotorOn &= ~1;
+		IsMotorGoingForward &= ~LEFT;
+		IsMotorTurning &= ~LEFT;
 		return;
 	}
 	LeftMotorStepCounter++;
+
 	if (LeftMotorDir == FORWARD) {
 		if (LeftMotorControl == 3) {
 			LeftMotorControl = 0;
 		}
 		else LeftMotorControl++;
-
 	}
 	else {
 		if (LeftMotorControl == 0) {
@@ -217,9 +247,11 @@ void LeftMotorStep() {
 
 void RightMotorStep() {
 	if (RightMotorStepCounter >= RightMotorStepTarget) {
-		IsMotorOn &= ~2;
+		IsMotorGoingForward &= ~RIGHT;
+		IsMotorTurning &= ~RIGHT;
 		return;
 	}
+	
 	RightMotorStepCounter++;
 	if (RightMotorDir == FORWARD) {
 		if (RightMotorControl == 3) {
@@ -250,10 +282,17 @@ void RightMotorStep() {
 }
 
 void Position() {
+	if (Robot_x == MAZE_SIZE && Robot_y == MAZE_SIZE) {
+		//RobotStart = 0;
+	}
 }
 
-
 void loop() {
+	if (KeyPushed == 1) {
+		delay(500);
+		KeyPushed = 0;
+	}
+
 	Sensor();
 	Position();
 	if (RobotStart == 1) {			//모터 동작 전체를 제어
@@ -271,7 +310,7 @@ void loop() {
 		LeftStep(0, 0, 0, 0);
 	}
 
-	if (IsMotorOn == 0) {
+	if (IsMotorTurning == 0) {
 		//if( FALSE == CheckWall(FRONT,0,5)) {  //3cm 이내에 벽이 없으면
 		if (Distance[FRONT] < 430) {
 			CalibrationDirection = 0;
@@ -321,7 +360,6 @@ void loop() {
 					CalibrationDirection = LEFT;
 					CalibrationValue = 2;
 				}
-
 			}
 
 			//lcd.setCursor(15, 1);
@@ -337,33 +375,54 @@ void loop() {
 			else {
 				//lcd.print("N");
 			}
-			GoForward();
+			if (IsMotorGoingForward == FALSE) {
+				delay(500);
+				GoForward();
+				switch (RobotDir) {
+					case NORTH :
+						Robot_y++;
+						break;
+					case SOUTH:
+						Robot_y--;
+						break;
+					case EAST:
+						Robot_x++;
+						break;
+					case WEST:
+						Robot_y--;
+						break;
+				}
+			}
 		}
 		else {
+			delay(500);
 			LeftSpeed = DEFAULT_SPEED;
 			RightSpeed = DEFAULT_SPEED;
 			//Serial.println("FrontWall detected");
 			if (Distance[LEFT] < Distance[RIGHT]) {   //왼쪽에 벽이 없으면
 				//Serial.println("Left");
 				LeftTurn();
+				RobotDir = (RobotDir + 1) % 4;
 			}
 			else {
 				//Serial.println("right");
 				RightTurn();
+				RobotDir = (RobotDir - 1) % 4;
 			}
 		}
 	}
 }
 
 ISR(PCINT0_vect) {
-	delay(1000);
-	if (1 == RobotStart) {
-		RobotStart = 0;
+	if (digitalRead(12) == 1 && KeyPushed == 0) {
+		KeyPushed = 1;
+		if (RobotStart == 0) {
+			RobotStart = 1;
+		}
+		else {
+			RobotStart = 0;
+		}
 	}
-	else {
-		RobotStart = 1;
-	}
-
 }
 
 
