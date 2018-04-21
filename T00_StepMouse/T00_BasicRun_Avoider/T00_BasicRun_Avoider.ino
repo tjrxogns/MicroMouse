@@ -22,16 +22,18 @@ LiquidCrystal lcd(2, 3, A3, A4, A5, 13); //핀 번호를 잘 확인하자
 #define FORWARD 1
 #define BACKWARD 2
 
-#define TURN_90_STEP 85   //90도 회전 스텝
-#define ONECELL_STEP 10   //1칸 이동 거리 (현재는 사용하지 않음)
+#define TURN_90_STEP 95   //90도 회전 스텝
+#define ONECELL_STEP 221   //바퀴지릅 5.2cm -> 한스텝 이동 거리 : 3.14 /200 = 0.0814cm -> 한칸 이동 스탭수 18cm/0.0814 = 221
+
 
 #define TRUE 1
 #define FALSE 0
 
 
 #define DEFAULT_SPEED 6000
-#define SPEED_OFFSET	1500		//자세보정후 보정 속도
-#define POSITON_CALIBRATIN_JUDGE	10		//자세보정 거리 판단 값
+#define SPEED_OFFSET	2500		//자세보정후 보정 속도
+#define SENSOR_CENTER	340
+#define POSITON_CALIBRATIN_JUDGE	20		//자세보정 거리 판단 값
 
 int LeftSpeed = DEFAULT_SPEED;
 int RightSpeed = DEFAULT_SPEED;
@@ -50,7 +52,8 @@ int Distance[3];    //front Left fight 순서로 센서값 저장
 #define LeftStep(a,b,c,d) digitalWrite(4, a);   digitalWrite(5, b);   digitalWrite(6, c);   digitalWrite(7, d);
 #define RightStep(a,b,c,d) digitalWrite(8, a);   digitalWrite(9, b);   digitalWrite(10, c);   digitalWrite(11, d);
 
-int IsMotorOn;			//특정 모터가 동작해야하는 상태인지 판단하는 변수
+int IsMotorTurning;			//특정 모터가 동작해야하는 상태인지 판단하는 변수
+int IsMotorGoingForward;
 int RobotStart;			//로봇의 동작 전체를 On/Off 하는 변수
 
 int CalibrationDirection;
@@ -92,7 +95,7 @@ void setup() {
 	//delay(500);
 
 	LeftMotorTimer = micros();
-	RightMotorTimer = micros() + 10;
+	RightMotorTimer = micros()+5;
 	systemTimer = millis();
 
 	LeftMotorDir = RightMotorDir = FORWARD;
@@ -116,10 +119,7 @@ void GoForward() {
 	LeftMotorStepCounter = 0;
 	RightMotorStepCounter = 0;
 	LeftMotorDir = RightMotorDir = FORWARD;
-	IsMotorOn |= 0;
-	IsMotorOn |= 0;		//직진할때는 모터 동작 상태를 설정하지 않음(계속 동작할수 있도록)
-						//lcd.setCursor(12, 0);
-						//lcd.print("FORW");
+	IsMotorGoingForward = LEFT | RIGHT;
 }
 
 void LeftTurn() {
@@ -129,9 +129,7 @@ void LeftTurn() {
 	RightMotorStepCounter = 0;
 	RightMotorDir = FORWARD;
 	LeftMotorDir = BACKWARD;
-	IsMotorOn |= 3;
-	//lcd.setCursor(12, 0);
-	//lcd.print("LEFT");
+	IsMotorTurning = LEFT | RIGHT;
 }
 
 void RightTurn() {
@@ -141,7 +139,7 @@ void RightTurn() {
 	RightMotorStepCounter = 0;
 	RightMotorDir = BACKWARD;
 	LeftMotorDir = FORWARD;
-	IsMotorOn |= 3;
+	IsMotorTurning = LEFT | RIGHT;
 	//lcd.setCursor(12, 0);
 	//lcd.print("RIGHT");
 }
@@ -178,30 +176,44 @@ void LCD(void) {
 	lcd.print(".");
 	lcd.print(temp % 100);
 
+		//////////////////////////////////////////////////센서값
+	if (0) {
+		lcd.setCursor(1, 1);
+		lcd.print("F");
+		printWithZero(Distance[FRONT]);
+		lcd.print(" L");
+		printWithZero(Distance[LEFT]);
+		lcd.print(" R");
+		printWithZero(Distance[RIGHT]);
+		lcd.setCursor(15, 1);						//LCD 출력시 검은 칸만 나오거나 LCD 반만 글씨가 출력되는 현상이 발생함. 커서의 마지막 위치를 지정했더니 그런 현상이 없어짐
+	}
 
-	//////////////////////////////////////////////////센서값
-	lcd.setCursor(1, 1);
-	lcd.print("F");
-	printWithZero(Distance[FRONT]);
-	lcd.print(" L");
-	printWithZero(Distance[LEFT]);
-	lcd.print(" R");
-	printWithZero(Distance[RIGHT]);
-	lcd.setCursor(15, 1);						//LCD 출력시 검은 칸만 나오거나 LCD 반만 글씨가 출력되는 현상이 발생함. 커서의 마지막 위치를 지정했더니 그런 현상이 없어짐
+	//////////////////////////////////////////////////각 모터의 스텝 회전수 : 
+	else {
+		lcd.setCursor(1, 1);
+		lcd.print("T");  //목표 회전수 : 220이상이면 직진, 90정도면 회전상태이다
+		printWithZero(RightMotorStepTarget);
+		lcd.print(" L");
+		printWithZero(LeftMotorStepCounter);
+		lcd.print(" R");
+		printWithZero(RightMotorStepCounter);
+		lcd.setCursor(15, 1);						//LCD 출력시 검은 칸만 나오거나 LCD 반만 글씨가 출력되는 현상이 발생함. 커서의 마지막 위치를 지정했더니 그런 현상이 없어짐
+	}
 }
 
 void LeftMotorStep() {
 	if (LeftMotorStepCounter >= LeftMotorStepTarget) {
-		IsMotorOn &= ~1;
+		IsMotorGoingForward &= ~LEFT;
+		IsMotorTurning &= ~LEFT;
 		return;
 	}
 	LeftMotorStepCounter++;
+
 	if (LeftMotorDir == FORWARD) {
 		if (LeftMotorControl == 3) {
 			LeftMotorControl = 0;
 		}
 		else LeftMotorControl++;
-
 	}
 	else {
 		if (LeftMotorControl == 0) {
@@ -227,9 +239,11 @@ void LeftMotorStep() {
 
 void RightMotorStep() {
 	if (RightMotorStepCounter >= RightMotorStepTarget) {
-		IsMotorOn &= ~2;
+		IsMotorGoingForward &= ~RIGHT;
+		IsMotorTurning &= ~RIGHT;
 		return;
 	}
+
 	RightMotorStepCounter++;
 	if (RightMotorDir == FORWARD) {
 		if (RightMotorControl == 3) {
@@ -267,6 +281,12 @@ void loop() {
 	if (KeyPushed == 1) {
 		delay(500);
 		KeyPushed = 0;
+		if (RobotStart == 0) {
+			RobotStart = 1;
+		}
+		else {
+			RobotStart = 0;
+		}
 	}
 	Sensor();
 	Position();
@@ -285,55 +305,55 @@ void loop() {
 		LeftStep(0, 0, 0, 0);
 	}
 
-	if (IsMotorOn == 0) {
+	if (IsMotorTurning == 0) {
 		//if( FALSE == CheckWall(FRONT,0,5)) {  //3cm 이내에 벽이 없으면
 		if (Distance[FRONT] < 430) {
 			CalibrationDirection = 0;
 			CalibrationValue = 0;
 			//if(TRUE == CheckWall(LEFT,4,5) ){
 			if (Distance[LEFT] > Distance[RIGHT]) {	//가까운 벽 기준으로 보정
-				if (Distance[LEFT] < 360 - (POSITON_CALIBRATIN_JUDGE * 3)) {//왼쪽에서 멀어지면	
+				if (Distance[LEFT] < SENSOR_CENTER - (POSITON_CALIBRATIN_JUDGE * 3)) {//왼쪽에서 멀어지면	
 					CalibrationDirection = LEFT;
-					CalibrationValue = 2;
+					CalibrationValue = 3;
 				}
-				else if (Distance[LEFT] < 360 - POSITON_CALIBRATIN_JUDGE * 2) {
+				else if (Distance[LEFT] < SENSOR_CENTER - POSITON_CALIBRATIN_JUDGE * 2) {
 					CalibrationDirection = LEFT;
 					CalibrationValue = 1;
 				}
-				else if (Distance[LEFT] < 360 - POSITON_CALIBRATIN_JUDGE) {
+				else if (Distance[LEFT] < SENSOR_CENTER - POSITON_CALIBRATIN_JUDGE) {
 					CalibrationDirection = 0;
 					CalibrationValue = 0;
 				}
-				else if (Distance[LEFT] < 360 + POSITON_CALIBRATIN_JUDGE) {
+				else if (Distance[LEFT] < SENSOR_CENTER + POSITON_CALIBRATIN_JUDGE) {
 					CalibrationDirection = RIGHT;
 					CalibrationValue = 1;
 				}
-				else {//if (Distance[LEFT] < 360 + (POSITON_CALIBRATIN_JUDGE *2)) {
+				else {//if (Distance[LEFT] < SENSOR_CENTER + (POSITON_CALIBRATIN_JUDGE *2)) {
 					CalibrationDirection = RIGHT;
-					CalibrationValue = 2;
+					CalibrationValue = 3;
 				}
 
 			}
 			else {
-				if (Distance[RIGHT] < 360 - (POSITON_CALIBRATIN_JUDGE * 3)) {//왼쪽에서 멀어지면	
+				if (Distance[RIGHT] < SENSOR_CENTER - (POSITON_CALIBRATIN_JUDGE * 3)) {//왼쪽에서 멀어지면	
 					CalibrationDirection = RIGHT;
-					CalibrationValue = 2;
+					CalibrationValue = 3;
 				}
-				else if (Distance[RIGHT] < 360 - POSITON_CALIBRATIN_JUDGE * 2) {
+				else if (Distance[RIGHT] < SENSOR_CENTER - POSITON_CALIBRATIN_JUDGE * 2) {
 					CalibrationDirection = RIGHT;
 					CalibrationValue = 1;
 				}
-				else if (Distance[RIGHT] < 360 - POSITON_CALIBRATIN_JUDGE) {
+				else if (Distance[RIGHT] < SENSOR_CENTER - POSITON_CALIBRATIN_JUDGE) {
 					CalibrationDirection = 0;
 					CalibrationValue = 0;
 				}
-				else if (Distance[RIGHT] < 360 + POSITON_CALIBRATIN_JUDGE) {
+				else if (Distance[RIGHT] < SENSOR_CENTER + POSITON_CALIBRATIN_JUDGE) {
 					CalibrationDirection = LEFT;
 					CalibrationValue = 1;
 				}
-				else {//if (Distance[RIGHT] < 360 + (POSITON_CALIBRATIN_JUDGE * 2)) {
+				else {//if (Distance[RIGHT] < SENSOR_CENTER + (POSITON_CALIBRATIN_JUDGE * 2)) {
 					CalibrationDirection = LEFT;
-					CalibrationValue = 2;
+					CalibrationValue = 3;
 				}
 
 			}
@@ -341,28 +361,26 @@ void loop() {
 			//lcd.setCursor(15, 1);
 			RightSpeed = LeftSpeed = DEFAULT_SPEED;
 			if (CalibrationDirection == LEFT) {
-				//lcd.print("L");
-				LeftSpeed = DEFAULT_SPEED + (SPEED_OFFSET * CalibrationValue * 2);
+				LeftSpeed = DEFAULT_SPEED + (SPEED_OFFSET * CalibrationValue);
 			}
 			else if (CalibrationDirection == RIGHT) {
-				//lcd.print("R");
-				RightSpeed = DEFAULT_SPEED + (SPEED_OFFSET * CalibrationValue * 2);
+				RightSpeed = DEFAULT_SPEED + (SPEED_OFFSET * CalibrationValue);
 			}
 			else {
-				//lcd.print("N");
 			}
-			GoForward();
+
+			if (IsMotorGoingForward == 0) {
+				GoForward();
+			}
 		}
 		else {
 			LeftSpeed = DEFAULT_SPEED;
 			RightSpeed = DEFAULT_SPEED;
 			//Serial.println("FrontWall detected");
 			if (Distance[LEFT] < Distance[RIGHT]) {   //왼쪽에 벽이 없으면
-													  //Serial.println("Left");
 				LeftTurn();
 			}
 			else {
-				//Serial.println("right");
 				RightTurn();
 			}
 		}
@@ -372,12 +390,6 @@ void loop() {
 ISR(PCINT0_vect) {
 	if (digitalRead(12) == 1 && KeyPushed == 0) {
 		KeyPushed = 1;
-		if (RobotStart == 0) {
-			RobotStart = 1;
-		}
-		else {
-			RobotStart = 0;
-		}
 	}
 }
 
