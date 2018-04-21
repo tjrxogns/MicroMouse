@@ -18,12 +18,19 @@ LiquidCrystal lcd(2, 3, A3, A4, A5, 13); //핀 번호를 잘 확인하자
 #define LEFT 1
 #define RIGHT 2
 
+#define NORTH 1
+#define EAST 2
+#define SOUTH 3
+#define WEST 4
+
+char dir[5] = { 'X', 'N', 'E', 'S', 'W' };
 
 #define FORWARD 1
 #define BACKWARD 2
 
 #define TURN_90_STEP 95   //90도 회전 스텝
-#define ONECELL_STEP 221   //바퀴지릅 5.2cm -> 한스텝 이동 거리 : 3.14 /200 = 0.0814cm -> 한칸 이동 스탭수 18cm/0.0814 = 221
+#define ONECELL_STEP 250   //바퀴지릅 5.2cm -> 한스텝 이동 거리 : 3.14 /200 = 0.0814cm -> 한칸 이동 스탭수 18cm/0.0814 = 221
+                   
 
 
 #define TRUE 1
@@ -62,6 +69,11 @@ int CalibrationValue;
 int voltage;
 int KeyPushed = 0;
 
+#define MAZE_SIZE 5
+int Robot_x = MAZE_SIZE;		//좌표를 +-로 계산하므로 미로크기를 초기위치로 지정
+int Robot_y = MAZE_SIZE;
+int RobotDir = NORTH;
+
 void setup() {
 	Serial.begin(9600);
 
@@ -70,7 +82,7 @@ void setup() {
 	lcd.begin(16, 2);
 	// Print a message to the LCD.
 	lcd.setCursor(0, 0);
-	lcd.print("Micro Mouse");
+	//lcd.print("Micro Mouse");
 	delay(500);
 	//////////////// StepMotor init
 	pinMode(4, OUTPUT);
@@ -115,11 +127,25 @@ int CheckWall(int sensor, int LowLimit, int HighLimit) {    //특정 센서가 cm 범�
 }
 
 void GoForward() {
-	LeftMotorStepTarget = RightMotorStepTarget = ONECELL_STEP;
+	LeftMotorStepTarget = RightMotorStepTarget = ONECELL_STEP*9;
 	LeftMotorStepCounter = 0;
 	RightMotorStepCounter = 0;
 	LeftMotorDir = RightMotorDir = FORWARD;
 	IsMotorGoingForward = LEFT | RIGHT;
+	switch (RobotDir) {
+	case NORTH:
+		Robot_y++;
+		break;
+	case SOUTH:
+		Robot_y--;
+		break;
+	case EAST:
+		Robot_x++;
+		break;
+	case WEST:
+		Robot_x--;
+		break;
+	}
 }
 
 void LeftTurn() {
@@ -167,8 +193,17 @@ void printWithZero(int num) {
 }
 
 void LCD(void) {
+	//////////////////////////////////////로봇 위치 및 방향
+	lcd.setCursor(0, 0);
+	lcd.print("(");
+	lcd.print(Robot_x);
+	lcd.print(",");
+	lcd.print(Robot_y);
+	lcd.print(")");
 
-	////////////////////////////////////전압
+	lcd.print(dir[RobotDir]);
+
+	//////////////////////////////////////////////////////// 배터리 전압
 	lcd.setCursor(12, 0);
 	long temp = voltage;
 	temp = temp * 500 / 1024 * 3;
@@ -203,7 +238,7 @@ void LCD(void) {
 
 void LeftMotorStep() {
 	if (LeftMotorStepCounter >= LeftMotorStepTarget) {
-		IsMotorGoingForward &= ~LEFT;
+		//IsMotorGoingForward &= ~LEFT;
 		IsMotorTurning &= ~LEFT;
 		return;
 	}
@@ -239,7 +274,7 @@ void LeftMotorStep() {
 
 void RightMotorStep() {
 	if (RightMotorStepCounter >= RightMotorStepTarget) {
-		IsMotorGoingForward &= ~RIGHT;
+		//IsMotorGoingForward &= ~RIGHT;
 		IsMotorTurning &= ~RIGHT;
 		return;
 	}
@@ -274,6 +309,9 @@ void RightMotorStep() {
 }
 
 void Position() {
+	if (Robot_x == MAZE_SIZE && Robot_y == MAZE_SIZE) {
+		//RobotStart = 0;
+	}
 }
 
 
@@ -287,6 +325,7 @@ void loop() {
 		else {
 			RobotStart = 0;
 		}
+		GoForward();
 	}
 	Sensor();
 	Position();
@@ -299,92 +338,105 @@ void loop() {
 			RightMotorTimer = micros();
 			RightMotorStep();
 		}
+		if (IsMotorTurning == 0) {
+			//if( FALSE == CheckWall(FRONT,0,5)) {  //3cm 이내에 벽이 없으면
+			if (Distance[FRONT] < 430) {
+				CalibrationDirection = 0;
+				CalibrationValue = 0;
+				//if(TRUE == CheckWall(LEFT,4,5) ){
+				if (Distance[LEFT] > Distance[RIGHT]) {	//가까운 벽 기준으로 보정
+					if (Distance[LEFT] < SENSOR_CENTER - (POSITON_CALIBRATIN_JUDGE * 3)) {//왼쪽에서 멀어지면	
+						CalibrationDirection = LEFT;
+						CalibrationValue = 3;
+					}
+					else if (Distance[LEFT] < SENSOR_CENTER - POSITON_CALIBRATIN_JUDGE * 2) {
+						CalibrationDirection = LEFT;
+						CalibrationValue = 1;
+					}
+					else if (Distance[LEFT] < SENSOR_CENTER - POSITON_CALIBRATIN_JUDGE) {
+						CalibrationDirection = 0;
+						CalibrationValue = 0;
+					}
+					else if (Distance[LEFT] < SENSOR_CENTER + POSITON_CALIBRATIN_JUDGE) {
+						CalibrationDirection = RIGHT;
+						CalibrationValue = 1;
+					}
+					else {//if (Distance[LEFT] < SENSOR_CENTER + (POSITON_CALIBRATIN_JUDGE *2)) {
+						CalibrationDirection = RIGHT;
+						CalibrationValue = 3;
+					}
+
+				}
+				else {
+					if (Distance[RIGHT] < SENSOR_CENTER - (POSITON_CALIBRATIN_JUDGE * 3)) {//왼쪽에서 멀어지면	
+						CalibrationDirection = RIGHT;
+						CalibrationValue = 3;
+					}
+					else if (Distance[RIGHT] < SENSOR_CENTER - POSITON_CALIBRATIN_JUDGE * 2) {
+						CalibrationDirection = RIGHT;
+						CalibrationValue = 1;
+					}
+					else if (Distance[RIGHT] < SENSOR_CENTER - POSITON_CALIBRATIN_JUDGE) {
+						CalibrationDirection = 0;
+						CalibrationValue = 0;
+					}
+					else if (Distance[RIGHT] < SENSOR_CENTER + POSITON_CALIBRATIN_JUDGE) {
+						CalibrationDirection = LEFT;
+						CalibrationValue = 1;
+					}
+					else {//if (Distance[RIGHT] < SENSOR_CENTER + (POSITON_CALIBRATIN_JUDGE * 2)) {
+						CalibrationDirection = LEFT;
+						CalibrationValue = 3;
+					}
+
+				}
+
+				//lcd.setCursor(15, 1);
+				RightSpeed = LeftSpeed = DEFAULT_SPEED;
+				if (CalibrationDirection == LEFT) {
+					LeftSpeed = DEFAULT_SPEED + (SPEED_OFFSET * CalibrationValue);
+				}
+				else if (CalibrationDirection == RIGHT) {
+					RightSpeed = DEFAULT_SPEED + (SPEED_OFFSET * CalibrationValue);
+				}
+				else {
+				}
+
+				if (IsMotorGoingForward == 0) {
+					delay(500);
+					GoForward();
+				}
+
+				else if ((RightMotorStepCounter + LeftMotorStepCounter) / 2 > ONECELL_STEP) {
+					delay(500);
+					GoForward();
+				}
+			}
+			else {
+				delay(1000);
+				LeftSpeed = DEFAULT_SPEED;
+				RightSpeed = DEFAULT_SPEED;
+				IsMotorGoingForward = 0;
+				//Serial.println("FrontWall detected");
+				if (Distance[LEFT] < Distance[RIGHT]) {   //왼쪽에 벽이 없으면
+					LeftTurn();
+					RobotDir = (RobotDir - 1);
+					if (RobotDir == 0) RobotDir = 4;
+				}
+				else {
+					RightTurn();
+					RobotDir = (RobotDir + 1);
+					if (RobotDir == 5) RobotDir = 1;
+				}
+			}
+		}
 	}
 	else {		//정지할때는 모터의 상을 모두 꺼준다.
 		RightStep(0, 0, 0, 0);
 		LeftStep(0, 0, 0, 0);
 	}
 
-	if (IsMotorTurning == 0) {
-		//if( FALSE == CheckWall(FRONT,0,5)) {  //3cm 이내에 벽이 없으면
-		if (Distance[FRONT] < 430) {
-			CalibrationDirection = 0;
-			CalibrationValue = 0;
-			//if(TRUE == CheckWall(LEFT,4,5) ){
-			if (Distance[LEFT] > Distance[RIGHT]) {	//가까운 벽 기준으로 보정
-				if (Distance[LEFT] < SENSOR_CENTER - (POSITON_CALIBRATIN_JUDGE * 3)) {//왼쪽에서 멀어지면	
-					CalibrationDirection = LEFT;
-					CalibrationValue = 3;
-				}
-				else if (Distance[LEFT] < SENSOR_CENTER - POSITON_CALIBRATIN_JUDGE * 2) {
-					CalibrationDirection = LEFT;
-					CalibrationValue = 1;
-				}
-				else if (Distance[LEFT] < SENSOR_CENTER - POSITON_CALIBRATIN_JUDGE) {
-					CalibrationDirection = 0;
-					CalibrationValue = 0;
-				}
-				else if (Distance[LEFT] < SENSOR_CENTER + POSITON_CALIBRATIN_JUDGE) {
-					CalibrationDirection = RIGHT;
-					CalibrationValue = 1;
-				}
-				else {//if (Distance[LEFT] < SENSOR_CENTER + (POSITON_CALIBRATIN_JUDGE *2)) {
-					CalibrationDirection = RIGHT;
-					CalibrationValue = 3;
-				}
-
-			}
-			else {
-				if (Distance[RIGHT] < SENSOR_CENTER - (POSITON_CALIBRATIN_JUDGE * 3)) {//왼쪽에서 멀어지면	
-					CalibrationDirection = RIGHT;
-					CalibrationValue = 3;
-				}
-				else if (Distance[RIGHT] < SENSOR_CENTER - POSITON_CALIBRATIN_JUDGE * 2) {
-					CalibrationDirection = RIGHT;
-					CalibrationValue = 1;
-				}
-				else if (Distance[RIGHT] < SENSOR_CENTER - POSITON_CALIBRATIN_JUDGE) {
-					CalibrationDirection = 0;
-					CalibrationValue = 0;
-				}
-				else if (Distance[RIGHT] < SENSOR_CENTER + POSITON_CALIBRATIN_JUDGE) {
-					CalibrationDirection = LEFT;
-					CalibrationValue = 1;
-				}
-				else {//if (Distance[RIGHT] < SENSOR_CENTER + (POSITON_CALIBRATIN_JUDGE * 2)) {
-					CalibrationDirection = LEFT;
-					CalibrationValue = 3;
-				}
-
-			}
-
-			//lcd.setCursor(15, 1);
-			RightSpeed = LeftSpeed = DEFAULT_SPEED;
-			if (CalibrationDirection == LEFT) {
-				LeftSpeed = DEFAULT_SPEED + (SPEED_OFFSET * CalibrationValue);
-			}
-			else if (CalibrationDirection == RIGHT) {
-				RightSpeed = DEFAULT_SPEED + (SPEED_OFFSET * CalibrationValue);
-			}
-			else {
-			}
-
-			if (IsMotorGoingForward == 0) {
-				GoForward();
-			}
-		}
-		else {
-			LeftSpeed = DEFAULT_SPEED;
-			RightSpeed = DEFAULT_SPEED;
-			//Serial.println("FrontWall detected");
-			if (Distance[LEFT] < Distance[RIGHT]) {   //왼쪽에 벽이 없으면
-				LeftTurn();
-			}
-			else {
-				RightTurn();
-			}
-		}
-	}
+	
 }
 
 ISR(PCINT0_vect) {
