@@ -36,11 +36,14 @@ void setup() {
   pinMode(11, OUTPUT);
   //pinMode(LED_BUILTIN, OUTPUT);
 
+  pinMode (12,INPUT);
   LeftMotorTimer = micros();
   RightMotorTimer = micros()+5;
   systemTimer = millis();
 
   LeftMotorDir = RightMotorDir = FORWARD;
+
+  while(digitalRead(12) == 0);//12번핀의 스위치가 눌리지 않으면 대기
 }
 
 
