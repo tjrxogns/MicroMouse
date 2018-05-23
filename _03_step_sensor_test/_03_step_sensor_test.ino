@@ -3,6 +3,8 @@ unsigned long LeftMotorTimer, RightMotorTimer, systemTimer;   //타이머 제어
 int LeftMotorDir, RightMotorDir;    //왼쪽 오른쪽 모터 방향
 int LeftMotorControl, RightMotorControl; //스텝모터 동작 순서를 저장하는 변수
 
+
+/////////////////////////////////// 스텝모터 펄스 출력용 함수
 #define LeftStep(a,b,c,d) digitalWrite(4, a);   digitalWrite(5, b);   digitalWrite(6, c);   digitalWrite(7, d);
 #define RightStep(a,b,c,d) digitalWrite(8, a);   digitalWrite(9, b);   digitalWrite(10, c);   digitalWrite(11, d);
 
@@ -52,7 +54,7 @@ void Sensor(void) {
   Distance[LEFT] = analogRead(LEFT_SENSOR);
   Distance[RIGHT] = analogRead(RIGHT_SENSOR);
  
-  if (millis() >= systemTimer + 500) { //500ms마다
+  if (millis() >= systemTimer + 500) { //500ms마다 시리얼모니터로 데이터 출력
     systemTimer = millis();
       Serial.print("Front = ");
       Serial.print(Distance[FRONT]);
