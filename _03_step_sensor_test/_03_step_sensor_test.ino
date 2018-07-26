@@ -43,7 +43,6 @@ void setup() {
   RightMotorTimer = micros()+5;
   systemTimer = millis();
 
-  LeftMotorDir = RightMotorDir = FORWARD;
 
   while(digitalRead(12) == 0);//12번핀의 스위치가 눌리지 않으면 대기
 }
@@ -66,18 +65,11 @@ void Sensor(void) {
 }
 
 void LeftMotorStep() {
-  if (LeftMotorDir == FORWARD) {
     if (LeftMotorControl == 3) {
       LeftMotorControl = 0;
     }
     else LeftMotorControl++;
-  }
-  else {
-    if (LeftMotorControl == 0) {
-      LeftMotorControl = 3;
-    }
-    else LeftMotorControl--;
-  }
+
   switch (LeftMotorControl) {
   case 3:
     LeftStep(1, 0, 0, 1);
@@ -96,18 +88,12 @@ void LeftMotorStep() {
 
 void RightMotorStep() {
   
-  if (RightMotorDir == FORWARD) {
-    if (RightMotorControl == 3) {
+  if (RightMotorControl == 3) {
       RightMotorControl = 0;
     }
     else RightMotorControl++;
-  }
-  else {
-    if (RightMotorControl == 0) {
-      RightMotorControl = 3;
-    }
-    else RightMotorControl--;
-  }
+
+
   switch (RightMotorControl) {
   case 0:
     RightStep(1, 0, 0, 1);

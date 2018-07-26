@@ -118,6 +118,7 @@ void LeftTurn() {
 void RightTurn() {
 	LeftMotorStepTarget = TURN_90_STEP;
 	RightMotorStepTarget = TURN_90_STEP;
+
 	LeftMotorStepCounter = 0;
 	RightMotorStepCounter = 0;
 	RightMotorDir = BACKWARD;
