@@ -403,17 +403,17 @@ void loop() {
 				}
 
 				if (IsMotorGoingForward == 0) {
-					delay(500);
+					//delay(500);
 					GoForward();
 				}
 
 				else if ((RightMotorStepCounter + LeftMotorStepCounter) / 2 > ONECELL_STEP) {
-					delay(500);
+					//delay(500);
 					GoForward();
 				}
 			}
 			else {
-				delay(1000);
+				//delay(1000);
 				LeftSpeed = DEFAULT_SPEED;
 				RightSpeed = DEFAULT_SPEED;
 				IsMotorGoingForward = 0;

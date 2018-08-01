@@ -12,8 +12,8 @@ int LeftMotorControl, RightMotorControl; //스텝모터 동작 순서를 저장�
 #define FORWARD 1
 #define BACKWARD 2
 
-#define FRONT_SENSOR A1
-#define LEFT_SENSOR A0
+#define FRONT_SENSOR A0
+#define LEFT_SENSOR A1
 #define RIGHT_SENSOR A2
 
 #define FRONT 0
