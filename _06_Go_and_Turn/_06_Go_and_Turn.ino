@@ -24,7 +24,9 @@
 #define TRUE 1
 #define FALSE 0
 
-
+#define LEFT_WALL_CLOSEST   500
+@define LEFT_WALL_FARTHEST  200  //이 값보다 작으면 벽이 없는 것
+"[뇬ㅆ뜨] 15:52:55:583   ㄴ
 #define DEFAULT_SPEED 6000
 #define SPEED_OFFSET  2500    //자세보정후 보정 속도
 #define SENSOR_CENTER 340
@@ -214,7 +216,7 @@ void RightMotorStep() {
 }
 
 void Correct() {    //벽을 따라 직진 보정
- 
+  if(
 }
 void loop() {
   //스위치 처리
