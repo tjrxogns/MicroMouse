@@ -2,7 +2,7 @@
 // 직진 상태에서 전방 센서 감지시 좌우 센서 판단하여 벽없는 방향으로 회전
 // 회전 함수는 직진과 별도로 Delay 함수로 구현한다.
 
-#define DEFAULT_SPEED 5000
+#define DEFAULT_SPEED 8000
 #define STEP_90_TURN 96
 
 //모터의 방향 
@@ -16,14 +16,12 @@
 #define RIGHT 2
 
 //각 센서의 핀번호 -> 실제 로봇에 따라 변경
-#define FRONT_SENSOR A0
-#define LEFT_SENSOR A1
+#define FRONT_SENSOR A1
+#define LEFT_SENSOR A0
 #define RIGHT_SENSOR A2
 
 int LeftSpeed = DEFAULT_SPEED;
 int RightSpeed = DEFAULT_SPEED;
-
-int LeftCorrectionValue = 0;
 
 unsigned long LeftMotorTimer, RightMotorTimer, systemTimer;
 
@@ -67,13 +65,15 @@ void setup() {
   pinMode(11, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
 
-  while(digitalRead(12) == 0);
+  systemTimer = millis();
+  while(digitalRead(12) == 0){
+    Sensor();
+  }
  
   LeftMotorTimer = micros();
   RightMotorTimer = micros()+10;
-  systemTimer = millis();
 
-  LeftMotorDir = STOP; 
+  LeftMotorDir = FORWARD; 
   RightMotorDir = FORWARD;
 }
 
@@ -84,7 +84,7 @@ void LeftMotorStep(){
     }
     else LeftMotorStepIndex++;
   }
-  else if(RightMotorDir == BACKWARD){
+  else if(LeftMotorDir == BACKWARD){
     if (LeftMotorStepIndex == 0){
        LeftMotorStepIndex = 3;
     }
@@ -124,7 +124,7 @@ void RightMotorStep(){
     else RightMotorStepIndex--;
   }
   else {    //STOP
-    LeftStep(0,0,0,0);
+    RightStep(0,0,0,0);
     return;
   }
   switch(RightMotorStepIndex){
@@ -149,52 +149,92 @@ void LeftTurn(){
   for (int i=0; i<= STEP_90_TURN; i++){
     LeftMotorStep();
     RightMotorStep();
-    delay(200);
+    delay(50);
   }
 }
 
 
-#define LEFT_WALL_CLOSEST   500
+void RightTurn(){
+  LeftMotorDir = FORWARD;
+  RightMotorDir = BACKWARD;
+  for (int i=0; i<= STEP_90_TURN; i++){
+    LeftMotorStep();
+    RightMotorStep();
+    delay(50);
+  }
+}
+
+#define LEFT_WALL_CLOSEST   550
 #define LEFT_WALL_CENTER   350    //왼쪽 벽을 기준으로 로봇이 미로에 중심에 있다고 판단할수 있는 값
-#define LEFT_WALL_FARTHEST  200  //이 값보다 작으면 벽이 없는 것
+#define LEFT_WALL_FARTHEST  150  //이 값보다 작으면 벽이 없는 것
 
-#define RIGHT_WALL_CLOSEST   500
+#define RIGHT_WALL_CLOSEST   550
 #define RIGHT_WALL_CENTER   350    //오른쪽 벽을 기준으로 로봇이 미로에 중심에 있다고 판단할수 있는 값
-#define RIGHT_WALL_FARTHEST  200  //이 값보다 작으면 벽이 없는 것
+#define RIGHT_WALL_FARTHEST  150  //이 값보다 작으면 벽이 없는 것
 
-#define CENTER_MARGIN   30  //로봇이 벽 중간 값에서 얼마의 범위를 중간으로 판단하고 보정하지 않을 것인지 결정하는 변수
+#define CENTER_MARGIN   50  //로봇이 벽 중간 값에서 얼마의 범위를 중간으로 판단하고 보정하지 않을 것인지 결정하는 변수
 
+#define CORRECT_RATIO 15 //센서값으로 보정할 모터 속도 비율
+
+int LeftCorrectionValue = 0;
+int RightCorrectionValue = 0;
 
 void Correct() {    //벽을 따라 직진 보정
   // 1. 왼쪽이나 오른쪽에 벽이 있을때 그 벽을 기준으로 보정한다. 벽이 양쪽 모두 없다면 직진
+  LeftCorrectionValue = 0;
+  RightCorrectionValue = 0;
   if(Distance[LEFT] < LEFT_WALL_CLOSEST && Distance[LEFT] > LEFT_WALL_FARTHEST){   
     if(  Distance[LEFT] < LEFT_WALL_CENTER + CENTER_MARGIN && Distance[LEFT] > LEFT_WALL_CENTER - CENTER_MARGIN){
       return;   //중간에 있으므로 보정할 필요없음
     }
     if(  Distance[LEFT] > LEFT_WALL_CENTER + CENTER_MARGIN) {   //왼쪽 벽에 가까운 상태]
       LeftCorrectionValue = Distance[LEFT] - LEFT_WALL_CENTER + CENTER_MARGIN;
-      
+   
     }
     else if (Distance[LEFT] < LEFT_WALL_CENTER - CENTER_MARGIN) { 
       LeftCorrectionValue = LEFT_WALL_CENTER - CENTER_MARGIN - Distance[LEFT];
     } 
-    Serial.print("LCV= "); Serial.print(LeftCorrectionValue);
+    //Serial.print("LCV= "); Serial.print(LeftCorrectionValue);
+  }
+  if(Distance[RIGHT] < RIGHT_WALL_CLOSEST && Distance[RIGHT] > RIGHT_WALL_FARTHEST){   
+    if(  Distance[RIGHT] < RIGHT_WALL_CENTER + CENTER_MARGIN && Distance[RIGHT] > RIGHT_WALL_CENTER - CENTER_MARGIN){
+      return;   //중간에 있으므로 보정할 필요없는 코드임
+    }
+    if(  Distance[RIGHT] > RIGHT_WALL_CENTER + CENTER_MARGIN) {   //왼쪽 벽에 가까운 상태]
+      RightCorrectionValue = Distance[RIGHT] - RIGHT_WALL_CENTER + CENTER_MARGIN;
+   
+    }
+    else if (Distance[RIGHT] < RIGHT_WALL_CENTER - CENTER_MARGIN) { 
+      RightCorrectionValue = RIGHT_WALL_CENTER - CENTER_MARGIN - Distance[RIGHT];
+    } 
+    //Serial.print("LCV= "); Serial.print(LeftCorrectionValue);
   }
 }
 
 
 void loop() {
   Sensor();
-	if(micros() >= LeftMotorTimer+LeftSpeed - LeftCorrectionValue*20) {
+  Correct();
+  if(micros() >= LeftMotorTimer+LeftSpeed - (LeftCorrectionValue * CORRECT_RATIO) + (RightCorrectionValue * CORRECT_RATIO)) {
 		LeftMotorTimer = micros();
 		LeftMotorStep();
 	}
-	if(micros() >= RightMotorTimer+RightSpeed + LeftCorrectionValue*20) {
+	if(micros() >= RightMotorTimer+RightSpeed + (LeftCorrectionValue * CORRECT_RATIO) - (RightCorrectionValue * CORRECT_RATIO)) {
 		RightMotorTimer = micros();
 		RightMotorStep();
 	}
-
-  Correct();  
+  
+  if (Distance[FRONT] > 430){
+    if (Distance[LEFT] < 430){
+      LeftTurn();
+    }
+    else if (Distance[RIGHT] < 430){
+      RightTurn();
+    }
+    LeftMotorDir = FORWARD; 
+    RightMotorDir = FORWARD;
+  }
+ 
 }
 
 
