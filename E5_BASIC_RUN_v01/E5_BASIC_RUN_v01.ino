@@ -2,7 +2,7 @@
 // 직진 상태에서 전방 센서 감지시 좌우 센서 판단하여 벽없는 방향으로 회전
 // 회전 함수는 직진과 별도로 Delay 함수로 구현한다.
 
-#define DEFAULT_SPEED 8000
+#define DEFAULT_SPEED 5000
 #define STEP_90_TURN 96
 
 //모터의 방향 
@@ -19,6 +19,11 @@
 #define FRONT_SENSOR A1
 #define LEFT_SENSOR A0
 #define RIGHT_SENSOR A2
+
+//각센서의 벽판단
+#define FRONT_WALL 430
+#define LEFT_WALL 200
+#define RIGHT_WALL 200
 
 int LeftSpeed = DEFAULT_SPEED;
 int RightSpeed = DEFAULT_SPEED;
@@ -149,7 +154,7 @@ void LeftTurn(){
   for (int i=0; i<= STEP_90_TURN; i++){
     LeftMotorStep();
     RightMotorStep();
-    delay(50);
+    delay(5);
   }
 }
 
@@ -160,7 +165,7 @@ void RightTurn(){
   for (int i=0; i<= STEP_90_TURN; i++){
     LeftMotorStep();
     RightMotorStep();
-    delay(50);
+    delay(5);
   }
 }
 
