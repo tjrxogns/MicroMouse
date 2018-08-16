@@ -23,12 +23,11 @@
 int LeftSpeed = DEFAULT_SPEED;
 int RightSpeed = DEFAULT_SPEED;
 
-int LeftCorrectionValue = 0;
 
 unsigned long LeftMotorTimer, RightMotorTimer, systemTimer;
 
-#define LeftStep(a,b,c,d) digitalWrite(4, a);   digitalWrite(5, b);   digitalWrite(6, c);   digitalWrite(7, d);
-#define RightStep(a,b,c,d) digitalWrite(8, a);   digitalWrite(9, b);   digitalWrite(10, c);   digitalWrite(11, d);
+#define RightStep(a,b,c,d) digitalWrite(4, a);   digitalWrite(5, b);   digitalWrite(6, c);   digitalWrite(7, d);
+#define LeftStep(a,b,c,d) digitalWrite(8, a);   digitalWrite(9, b);   digitalWrite(10, c);   digitalWrite(11, d);
 
 int LeftMotorDir, RightMotorDir;             //스텝모터 방향 (위에서 본 모습)
 int LeftMotorStepIndex, RightMotorStepIndex; //스텝모터 스텝 상태를 결정하는 변수
@@ -73,7 +72,7 @@ void setup() {
   RightMotorTimer = micros()+10;
   systemTimer = millis();
 
-  LeftMotorDir = STOP; 
+  LeftMotorDir = FORWARD; 
   RightMotorDir = FORWARD;
 }
 
@@ -84,7 +83,7 @@ void LeftMotorStep(){
     }
     else LeftMotorStepIndex++;
   }
-  else if(RightMotorDir == BACKWARD){
+  else if(LeftMotorDir == BACKWARD){
     if (LeftMotorStepIndex == 0){
        LeftMotorStepIndex = 3;
     }
@@ -124,20 +123,20 @@ void RightMotorStep(){
     else RightMotorStepIndex--;
   }
   else {    //STOP
-    LeftStep(0,0,0,0);
+    RightStep(0,0,0,0);
     return;
   }
   switch(RightMotorStepIndex){
-    case 0:
+    case 3:
       RightStep(1,0,0,1);
     break;
-    case 1:
+    case 2:
       RightStep(0,1,0,1);
     break;
-    case 2:
+    case 1:
       RightStep(0,1,1,0);
     break;
-    case 3:
+    case 0:
       RightStep(1,0,1,0);
     break;
   }
@@ -164,6 +163,8 @@ void LeftTurn(){
 
 #define CENTER_MARGIN   30  //로봇이 벽 중간 값에서 얼마의 범위를 중간으로 판단하고 보정하지 않을 것인지 결정하는 변수
 
+int LeftCorrectionValue = 0;
+
 
 void Correct() {    //벽을 따라 직진 보정
   // 1. 왼쪽이나 오른쪽에 벽이 있을때 그 벽을 기준으로 보정한다. 벽이 양쪽 모두 없다면 직진
@@ -178,18 +179,18 @@ void Correct() {    //벽을 따라 직진 보정
     else if (Distance[LEFT] < LEFT_WALL_CENTER - CENTER_MARGIN) { 
       LeftCorrectionValue = LEFT_WALL_CENTER - CENTER_MARGIN - Distance[LEFT];
     } 
-    Serial.print("LCV= "); Serial.print(LeftCorrectionValue);
+    //Serial.print("LCV= "); Serial.print(LeftCorrectionValue);
   }
 }
 
 
 void loop() {
   Sensor();
-	if(micros() >= LeftMotorTimer+LeftSpeed - LeftCorrectionValue*20) {
+	if(micros() >= LeftMotorTimer+LeftSpeed) {
 		LeftMotorTimer = micros();
 		LeftMotorStep();
 	}
-	if(micros() >= RightMotorTimer+RightSpeed + LeftCorrectionValue*20) {
+	if(micros() >= RightMotorTimer+RightSpeed) {
 		RightMotorTimer = micros();
 		RightMotorStep();
 	}

@@ -69,7 +69,7 @@ void setup() {
   RightMotorTimer = micros()+10;
   systemTimer = millis();
 
-  LeftMotorDir = STOP; 
+  LeftMotorDir = FORWARD; 
   RightMotorDir = FORWARD;
 }
 
